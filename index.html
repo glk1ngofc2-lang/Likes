@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Painel simples para testar a API de likes do Free Fire.">
+<title>Free Fire Likes • API Tester</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="wrap">
+  <section class="card">
+    <div class="badge">FREE FIRE • API TESTER</div>
+    <h1>Teste de Likes</h1>
+    <p class="sub">Digite o UID e consulte a API que já está online.</p>
+
+    <div id="status" class="status checking"><span></span> Verificando API...</div>
+
+    <label for="uid">UID do jogador</label>
+    <div class="input-row">
+      <input id="uid" inputmode="numeric" autocomplete="off" placeholder="Ex.: 123456789">
+      <button id="testBtn">TESTAR API</button>
+    </div>
+    <p id="msg" class="msg"></p>
+
+    <div id="result" class="result hidden">
+      <div class="grid">
+        <div class="item"><small>Jogador</small><strong id="player">—</strong></div>
+        <div class="item"><small>Servidor</small><strong id="server">—</strong></div>
+        <div class="item"><small>Likes antes</small><strong id="before">—</strong></div>
+        <div class="item"><small>Likes depois</small><strong id="after">—</strong></div>
+        <div class="item full"><small>Likes adicionados</small><strong id="added">—</strong></div>
+      </div>
+      <pre id="raw"></pre>
+    </div>
+
+    <footer>API: <span id="apiUrl"></span></footer>
+  </section>
+</main>
+<script>
+const API_BASE = "https://free-api-like-freefire-1-bzin.onrender.com";
+document.getElementById("apiUrl").textContent = API_BASE;
+const $ = id => document.getElementById(id);
+const status = $("status");
+
+function setStatus(ok, text) {
+  status.className = "status " + (ok ? "online" : "offline");
+  status.innerHTML = "<span></span> " + text;
+}
+
+async function healthCheck() {
+  try {
+    const r = await fetch(API_BASE + "/health-check", {cache:"no-store"});
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    setStatus(true, "API Online");
+  } catch(e) {
+    setStatus(false, "API Offline ou CORS bloqueado");
+  }
+}
+
+function showMessage(text, bad=false) {
+  $("msg").textContent = text;
+  $("msg").className = "msg " + (bad ? "bad" : "");
+}
+
+function value(obj, keys) {
+  for (const k of keys) if (obj && obj[k] !== undefined && obj[k] !== null) return obj[k];
+  return "—";
+}
+
+async function testApi() {
+  const uid = $("uid").value.trim();
+  $("result").classList.add("hidden");
+  if (!/^\d{5,20}$/.test(uid)) {
+    showMessage("Digite um UID numérico válido.", true);
+    return;
+  }
+  $("testBtn").disabled = true;
+  $("testBtn").textContent = "TESTANDO...";
+  showMessage("Consultando a API...");
+  try {
+    const r = await fetch(API_BASE + "/like?uid=" + encodeURIComponent(uid), {cache:"no-store"});
+    const text = await r.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = {raw:text}; }
+    if (!r.ok) throw new Error("HTTP " + r.status + ": " + text.slice(0,300));
+
+    $("player").textContent = value(data, ["player","player_name","name","nickname"]);
+    $("server").textContent = value(data, ["server","region","country"]);
+    $("before").textContent = value(data, ["likes_before","before","likesBefore"]);
+    $("after").textContent = value(data, ["likes_after","after","likesAfter"]);
+    $("added").textContent = value(data, ["likes_added","added","likesAdded"]);
+    $("raw").textContent = JSON.stringify(data, null, 2);
+    $("result").classList.remove("hidden");
+    showMessage("Resposta recebida com sucesso.");
+    setStatus(true, "API Online");
+  } catch(e) {
+    showMessage("Falha ao consultar: " + e.message, true);
+    setStatus(false, "Não foi possível consultar a API");
+  } finally {
+    $("testBtn").disabled = false;
+    $("testBtn").textContent = "TESTAR API";
+  }
+}
+
+$("testBtn").addEventListener("click", testApi);
+$("uid").addEventListener("keydown", e => { if(e.key === "Enter") testApi(); });
+healthCheck();
+</script>
+</body>
+</html>
